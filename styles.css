@@ -260,14 +260,14 @@ body {
 
 .stat-icon {
   font-size: 2.5rem;
-  color: var(--light-green);
+  color: var(--secondary-green);
   margin-bottom: 1rem;
 }
 
 .stat-number {
   font-size: 3rem;
   font-weight: bold;
-  color: var(--light-green);
+  color: var(--primary-green);
   display: block;
 }
 
@@ -674,6 +674,8 @@ section {
 .drone-features {
     margin-top: 1.5rem;
     padding-top: 1rem;
+    margin-left: 1rem;
+    margin-bottom: 1rem;
     border-top: 1px solid var(--border-color);
 }
 
@@ -789,7 +791,7 @@ section {
 .stat-label {
     min-width: 80px;
     font-size: 0.9rem;
-    color: var(--dark-gray);
+    color: white;
     font-weight: 500;
 }
 
@@ -1773,7 +1775,7 @@ section {
 
 .contact-item i {
   font-size: 2rem;
-  color: var(--light-green);
+  color: white;
   min-width: 40px;
 }
 
@@ -1790,7 +1792,7 @@ section {
 }
 
 .contact-details span {
-  color: var(--light-green);
+  color: var(--primary-green);
   font-size: 0.9rem;
 }
 
@@ -1846,7 +1848,7 @@ section {
 }
 
 .contact-form-container p {
-  color: var(--light-green);
+  color: white;
   text-align: center;
   margin-bottom: 2rem;
 }
@@ -1889,7 +1891,7 @@ section {
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--light-green);
+  color: var(--pr);
   z-index: 1;
 }
 
