@@ -1,15 +1,7 @@
-// Configuração da API
-const API_BASE_URL = 'http://localhost:3000/api';
-
 // DOM Elements
 const navToggle = document.getElementById('nav-toggle');
 const navMenu = document.getElementById('nav-menu');
 const header = document.getElementById('header');
-const addCertBtn = document.getElementById('add-cert-btn');
-const certModal = document.getElementById('cert-modal');
-const closeModal = document.getElementById('close-modal');
-const certForm = document.getElementById('cert-form');
-const certificationsGrid = document.getElementById('certifications-grid');
 const contactForm = document.getElementById('contact-form');
 
 // Mobile Navigation Toggle
@@ -47,408 +39,40 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// API Functions
-class DronesPulvetechAPI {
-    static async request(endpoint, options = {}) {
-        try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...options.headers
-                },
-                ...options
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
-        }
-    }
-
-    // Certificações
-    static async getCertifications() {
-        return this.request('/certifications');
-    }
-
-    static async createCertification(data) {
-        return this.request('/certifications', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-    }
-
-    static async deleteCertification(id) {
-        return this.request(`/certifications/${id}`, {
-            method: 'DELETE'
-        });
-    }
-
-    // Contatos
-    static async createContact(data) {
-        return this.request('/contacts', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-    }
-
-    // Drones
-    static async getDrones() {
-        return this.request('/drones');
-    }
-
-    // Estatísticas
-    static async getStatistics() {
-        return this.request('/statistics');
-    }
-
-    // Upload de arquivo
-    static async uploadFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch(`${API_BASE_URL}/upload`, {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!response.ok) {
-            throw new Error(`Upload error! status: ${response.status}`);
-        }
-
-        return await response.json();
-    }
-}
-
-// Certificações Management
-addCertBtn?.addEventListener('click', () => {
-    certModal.style.display = 'block';
-});
-
-closeModal?.addEventListener('click', () => {
-    certModal.style.display = 'none';
-});
-
-window.addEventListener('click', (e) => {
-    if (e.target === certModal) {
-        certModal.style.display = 'none';
-    }
-});
-
-// Certificate form submission
-certForm?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    try {
-        const submitBtn = certForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<div class="loading"></div> Salvando...';
-
-        let filePath = null;
-
-        // Upload do arquivo se existir
-        const fileInput = document.getElementById('cert-file');
-        if (fileInput.files[0]) {
-            const uploadResult = await DronesPulvetechAPI.uploadFile(fileInput.files[0]);
-            filePath = uploadResult.path;
-        }
-
-        const certification = {
-            pilot_name: document.getElementById('pilot-name').value,
-            cert_type: document.getElementById('cert-type').value,
-            issue_date: document.getElementById('issue-date').value,
-            expiry_date: document.getElementById('expiry-date').value,
-            file_path: filePath
-        };
-        
-        await DronesPulvetechAPI.createCertification(certification);
-        
-        await loadCertifications();
-        certModal.style.display = 'none';
-        certForm.reset();
-        
-        showMessage('Certificação adicionada com sucesso!', 'success');
-    } catch (error) {
-        showMessage('Erro ao adicionar certificação: ' + error.message, 'error');
-    } finally {
-        const submitBtn = certForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Salvar Certificação';
-    }
-});
-
-// Load certifications from database
-async function loadCertifications() {
-    if (!certificationsGrid) return;
-    
-    try {
-        const certifications = await DronesPulvetechAPI.getCertifications();
-        renderCertifications(certifications);
-    } catch (error) {
-        console.error('Erro ao carregar certificações:', error);
-        certificationsGrid.innerHTML = `
-            <div class="error-message">
-                <p>Erro ao carregar certificações. Verifique se o servidor está rodando.</p>
-            </div>
-        `;
-    }
-}
-
-// Render certifications
-function renderCertifications(certifications) {
-    if (!certificationsGrid) return;
-    
-    certificationsGrid.innerHTML = '';
-    
-    if (certifications.length === 0) {
-        certificationsGrid.innerHTML = `
-            <div class="no-certifications">
-                <p>Nenhuma certificação cadastrada ainda.</p>
-                <p>Clique em "Adicionar Certificação" para começar.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    certifications.forEach(cert => {
-        const certCard = createCertificationCard(cert);
-        certificationsGrid.appendChild(certCard);
-    });
-}
-
-// Create certification card
-function createCertificationCard(cert) {
-    const card = document.createElement('div');
-    card.className = 'cert-card';
-    
-    const statusText = getStatusText(cert.validation_status);
-    const statusClass = getStatusClass(cert.validation_status);
-    
-    card.innerHTML = `
-        <div class="cert-status ${statusClass}">${statusText}</div>
-        <div class="cert-header">
-            <div>
-                <h4>${cert.pilot_name}</h4>
-                <p><strong>Tipo:</strong> ${cert.cert_type}</p>
-            </div>
-            <div class="cert-actions">
-                <button class="btn btn-small btn-danger" onclick="deleteCertification(${cert.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-        <div class="cert-details">
-            <p><strong>Emissão:</strong> ${formatDate(cert.issue_date)}</p>
-            <p><strong>Validade:</strong> ${formatDate(cert.expiry_date)}</p>
-            ${cert.file_path ? `<p><strong>Arquivo:</strong> <a href="${cert.file_path}" >Ver certificado</a></p>` : ''}
-        </div>
-    `;
-    
-    return card;
-}
-
-// Get status text
-function getStatusText(status) {
-    switch (status) {
-        case 'valid': return 'Válido';
-        case 'expiring_soon': return 'Expira em breve';
-        case 'expired': return 'Expirado';
-        default: return 'Válido';
-    }
-}
-
-// Get status CSS class
-function getStatusClass(status) {
-    switch (status) {
-        case 'valid': return 'status-valid';
-        case 'expiring_soon': return 'status-expiring';
-        case 'expired': return 'status-expired';
-        default: return 'status-valid';
-    }
-}
-
-// Format date
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-}
-
-// Delete certification
-async function deleteCertification(id) {
-    if (confirm('Tem certeza que deseja excluir esta certificação?')) {
-        try {
-            await DronesPulvetechAPI.deleteCertification(id);
-            await loadCertifications();
-            showMessage('Certificação excluída com sucesso!', 'success');
-        } catch (error) {
-            showMessage('Erro ao excluir certificação: ' + error.message, 'error');
-        }
-    }
-}
-
-// Contact form submission
+// Contact form submission (simple version without API)
 contactForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const submitBtn = contactForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    submitBtn.disabled = true;
+    
     try {
-        const submitBtn = contactForm.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
+        // Simulate form submission (replace with your actual form handler)
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        submitBtn.innerHTML = '<div class="loading"></div> Enviando...';
-        submitBtn.disabled = true;
-        
-        const formData = new FormData(contactForm);
-        const contactData = {
-            name: formData.get('name') || contactForm.querySelector('input[placeholder="Nome Completo"]').value,
-            email: formData.get('email') || contactForm.querySelector('input[placeholder="E-mail"]').value,
-            phone: formData.get('phone') || contactForm.querySelector('input[placeholder="Telefone"]').value,
-            property_name: formData.get('property') || contactForm.querySelector('input[placeholder="Propriedade/Fazenda"]').value,
-            area_hectares: formData.get('area') || contactForm.querySelector('input[placeholder="Área (hectares)"]').value,
-            application_type: formData.get('application_type') || contactForm.querySelector('select').value,
-            observations: formData.get('observations') || contactForm.querySelector('textarea').value
-        };
-        
-        await DronesPulvetechAPI.createContact(contactData);
-        
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
+        // Success
         contactForm.reset();
         showMessage('Solicitação enviada com sucesso! Entraremos em contato em breve.', 'success');
+        
     } catch (error) {
-        const submitBtn = contactForm.querySelector('button[type="submit"]');
-        submitBtn.innerHTML = 'Enviar Solicitação';
+        showMessage('Erro ao enviar solicitação. Tente novamente.', 'error');
+    } finally {
+        // Reset button
+        submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
-        showMessage('Erro ao enviar solicitação: ' + error.message, 'error');
     }
 });
 
-// Load and display drones
-async function loadDrones() {
-    try {
-        const drones = await DronesPulvetechAPI.getDrones();
-        renderDrones(drones);
-    } catch (error) {
-        console.error('Erro ao carregar drones:', error);
-    }
-}
-
-// Render drones
-function renderDrones(drones) {
-    const dronesGrid = document.querySelector('.drones-grid');
-    if (!dronesGrid) return;
-    
-    dronesGrid.innerHTML = '';
-    
-    drones.forEach(drone => {
-        const droneCard = createDroneCard(drone);
-        dronesGrid.appendChild(droneCard);
-    });
-}
-
-// Create drone card
-function createDroneCard(drone) {
-    const card = document.createElement('div');
-    card.className = 'drone-card';
-    
-    card.innerHTML = `
-        <div class="drone-image">
-            ${drone.image_path ? 
-                `<img src="${drone.image_path}" alt="${drone.name}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px;">` :
-                `<i class="fas fa-drone"></i>`
-            }
-        </div>
-        <h4>${drone.name}</h4>
-        <p class="drone-model">${drone.model}</p>
-        <div class="drone-specs">
-            <div class="spec-item">
-                <span class="spec-label">Capacidade:</span>
-                <span class="spec-value">${drone.capacity}L</span>
-            </div>
-            <div class="spec-item">
-                <span class="spec-label">Autonomia:</span>
-                <span class="spec-value">${drone.autonomy} min</span>
-            </div>
-            <div class="spec-item">
-                <span class="spec-label">Área/voo:</span>
-                <span class="spec-value">${drone.area_per_flight} hectares</span>
-            </div>
-            <div class="spec-item">
-                <span class="spec-label">Aplicação:</span>
-                <span class="spec-value">${drone.application_type}</span>
-            </div>
-        </div>
-        ${drone.specifications && Object.keys(drone.specifications).length > 0 ? `
-            <div class="drone-additional-specs">
-                <h5>Especificações Técnicas:</h5>
-                ${Object.entries(drone.specifications).map(([key, value]) => `
-                    <div class="spec-item">
-                        <span class="spec-label">${key}:</span>
-                        <span class="spec-value">${value}</span>
-                    </div>
-                `).join('')}
-            </div>
-        ` : ''}
-    `;
-    
-    return card;
-}
-
-// Load and display statistics
-async function loadStatistics() {
-    try {
-        const statistics = await DronesPulvetechAPI.getStatistics();
-        renderStatistics(statistics);
-    } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error);
-    }
-}
-
-// Render statistics
-function renderStatistics(statistics) {
-    // Update home stats
-    const statsGrid = document.querySelector('.stats-grid');
-    if (statsGrid) {
-        const homeStats = statistics.filter(stat => 
-            ['total_drones', 'certified_pilots', 'hectares_served', 'years_experience'].includes(stat.metric_name)
-        );
-        
-        statsGrid.innerHTML = '';
-        homeStats.forEach(stat => {
-            const statItem = document.createElement('div');
-            statItem.className = 'stat-item';
-            statItem.innerHTML = `
-                <div class="stat-number">${stat.metric_value}${stat.metric_unit}</div>
-                <div class="stat-label">${stat.description}</div>
-            `;
-            statsGrid.appendChild(statItem);
-        });
-    }
-    
-    // Update quality metrics
-    const metricsGrid = document.querySelector('.metrics-grid');
-    if (metricsGrid) {
-        const qualityStats = statistics.filter(stat => 
-            ['precision', 'economy', 'coverage', 'time_reduction'].includes(stat.metric_name)
-        );
-        
-        const metricCards = metricsGrid.querySelectorAll('.metric-card');
-        qualityStats.forEach((stat, index) => {
-            if (metricCards[index]) {
-                const valueElement = metricCards[index].querySelector('.metric-value');
-                if (valueElement) {
-                    valueElement.textContent = stat.metric_value + stat.metric_unit;
-                }
-            }
-        });
-    }
-}
-
 // Show message function
 function showMessage(text, type) {
+    // Remove existing messages
+    const existingMessages = document.querySelectorAll('.message');
+    existingMessages.forEach(msg => msg.remove());
+    
     const message = document.createElement('div');
     message.className = `message message-${type}`;
     message.textContent = text;
@@ -500,19 +124,20 @@ function setupScrollAnimations() {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('fade-in-up');
+                observer.unobserve(entry.target); // Stop observing after animation
             }
         });
     }, observerOptions);
     
     // Observe elements for animation
-    document.querySelectorAll('.service-card, .drone-card, .metric-card, .contact-item').forEach(el => {
+    document.querySelectorAll('.service-card, .drone-card, .metric-card, .about-card, .guideline-card').forEach(el => {
         observer.observe(el);
     });
 }
 
 // Counter animation for stats
 function animateCounters() {
-    const counters = document.querySelectorAll('.stat-number');
+    const counters = document.querySelectorAll('.stat-number, .metric-value');
     
     const observerOptions = {
         threshold: 0.5
@@ -522,10 +147,13 @@ function animateCounters() {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const counter = entry.target;
-                const target = parseInt(counter.textContent.replace(/\D/g, ''));
-                const suffix = counter.textContent.replace(/\d/g, '');
+                const text = counter.textContent;
+                const target = parseInt(text.replace(/\D/g, ''));
                 
-                animateCounter(counter, target, suffix);
+                if (target > 0) {
+                    const suffix = text.replace(/[\d.]/g, '');
+                    animateCounter(counter, target, suffix);
+                }
                 observer.unobserve(counter);
             }
         });
@@ -540,6 +168,9 @@ function animateCounters() {
 function animateCounter(element, target, suffix) {
     let current = 0;
     const increment = target / 50;
+    const duration = 2000; // 2 seconds
+    const stepTime = duration / 50;
+    
     const timer = setInterval(() => {
         current += increment;
         if (current >= target) {
@@ -548,7 +179,7 @@ function animateCounter(element, target, suffix) {
         } else {
             element.textContent = Math.floor(current) + suffix;
         }
-    }, 30);
+    }, stepTime);
 }
 
 // Form validation
@@ -630,45 +261,90 @@ function setupPhoneFormatting() {
     });
 }
 
-// Connection status indicator
-function setupConnectionStatus() {
-    const statusIndicator = document.createElement('div');
-    statusIndicator.className = 'connection-status';
-    statusIndicator.innerHTML = '<i class="fas fa-wifi"></i> <span>Conectado</span>';
+// Dropdown menu enhancement for mobile
+function setupDropdownMenus() {
+    const dropdowns = document.querySelectorAll('.dropdown');
     
-    // Add to header
-    const nav = document.querySelector('.nav');
-    if (nav) {
-        nav.appendChild(statusIndicator);
+    dropdowns.forEach(dropdown => {
+        const dropdownMenu = dropdown.querySelector('.dropdown-menu');
+        
+        // Handle mobile touch events
+        dropdown.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                e.preventDefault();
+                dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+            }
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target)) {
+                dropdownMenu.style.display = 'none';
+            }
+        });
+    });
+}
+
+// Performance optimization: Lazy loading for images
+function setupLazyLoading() {
+    const images = document.querySelectorAll('img[loading="lazy"]');
+    
+    if ('IntersectionObserver' in window) {
+        const imageObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    img.src = img.dataset.src || img.src;
+                    img.classList.remove('lazy');
+                    imageObserver.unobserve(img);
+                }
+            });
+        });
+        
+        images.forEach(img => imageObserver.observe(img));
     }
+}
+
+// Enhanced form submission with better UX
+function enhanceFormSubmission() {
+    const forms = document.querySelectorAll('form');
     
-    // Check connection periodically
-    setInterval(async () => {
-        try {
-            await DronesPulvetechAPI.getStatistics();
-            statusIndicator.className = 'connection-status connected';
-            statusIndicator.innerHTML = '<i class="fas fa-wifi"></i> <span>Conectado</span>';
-        } catch (error) {
-            statusIndicator.className = 'connection-status disconnected';
-            statusIndicator.innerHTML = '<i class="fas fa-wifi-slash"></i> <span>Desconectado</span>';
-        }
-    }, 30000); // Check every 30 seconds
+    forms.forEach(form => {
+        form.addEventListener('submit', (e) => {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+            
+            // Validate all required fields
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('invalid');
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                showMessage('Por favor, preencha todos os campos obrigatórios.', 'error');
+                return;
+            }
+        });
+    });
 }
 
 // Initialize everything when DOM is loaded
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     createScrollTopButton();
     setupScrollAnimations();
     setupFormValidation();
     setupPhoneFormatting();
-    setupConnectionStatus();
+    setupDropdownMenus();
+    setupLazyLoading();
+    enhanceFormSubmission();
     
-    // Load data from database
-    await loadCertifications();
-    await loadDrones();
-    await loadStatistics();
-    
-    // Animate counters after loading stats
+    // Animate counters after a short delay
     setTimeout(() => {
         animateCounters();
     }, 500);
@@ -677,19 +353,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Error handling
 window.addEventListener('error', (e) => {
     console.error('Erro na aplicação:', e.error);
-    showMessage('Ocorreu um erro inesperado. Verifique o console para mais detalhes.', 'error');
+    // Only show user-friendly errors in production
+    if (window.location.hostname !== 'localhost') {
+        showMessage('Ocorreu um erro inesperado. Tente recarregar a página.', 'error');
+    }
 });
 
-// Service Worker registration (for PWA capabilities)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                console.log('SW registrado com sucesso:', registration);
-            })
-            .catch(registrationError => {
-                console.log('Falha no registro do SW:', registrationError);
-            });
-    });
-}
+// Handle offline/online status
+window.addEventListener('online', () => {
+    showMessage('Conexão com a internet restaurada.', 'success');
+});
 
+window.addEventListener('offline', () => {
+    showMessage('Você está offline. Algumas funcionalidades podem não funcionar.', 'error');
+});
+
+// Prevent form resubmission on page refresh
+if (window.history.replaceState) {
+    window.history.replaceState(null, null, window.location.href);
+}
